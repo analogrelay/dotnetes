@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: dotnetes-operator
   namespace: dotnetes-system
+  labels:
+    "dotnetes.dot.net/dotnetes": "1"
 spec:
   selector:
     matchLabels:
@@ -15,7 +17,3 @@ spec:
       containers:
       - name: dotnetes-operator
         image: anursedotnetes.azurecr.io/dotnetes/operator
-        resources:
-          limits:
-            memory: "128Mi"
-            cpu: "500m"
