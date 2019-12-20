@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dotnetes-operator
+  namespace: dotnetes-system
+spec:
+  selector:
+    matchLabels:
+      app: dotnetes-operator
+  template:
+    metadata:
+      labels:
+        app: dotnetes-operator
+    spec:
+      containers:
+      - name: dotnetes-operator
+        image: anursedotnetes.azurecr.io/dotnetes/operator
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"

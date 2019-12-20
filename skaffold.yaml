@@ -1,0 +1,16 @@
+apiVersion: skaffold/v2alpha1
+kind: Config
+metadata:
+  name: dotnetes
+build:
+  artifacts:
+  - image: anursedotnetes.azurecr.io/dotnetes/operator
+    context: ./src/Dotnetes.Operator
+    docker:
+  tagPolicy:
+    sha256: {}
+deploy:
+  kubectl:
+    manifests:
+    - .\deploy\*.yml
+    - .\deploy\*.yaml

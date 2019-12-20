@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <RootNamespace>Dotnetes.CommandLine</RootNamespace>
+    <PackAsTool>true</PackAsTool>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Resources\dotnetapp.yml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Default.dockerfile" />
+    <EmbeddedResource Include="Resources\dotnetapp.yml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="McMaster.Extensions.CommandLineUtils" Version="2.4.4" />
+  </ItemGroup>
+
+</Project>

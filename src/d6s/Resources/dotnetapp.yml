@@ -1,0 +1,7 @@
+apiVersion: dotnetes.dot.net/v1alpha1
+kind: DotNetApp
+metadata:
+  name: "!APPNAME!"
+spec:
+  image: "!APPIMAGE!"
+  replicas: 1
