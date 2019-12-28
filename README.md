@@ -11,19 +11,25 @@ Pre-requisites:
     * Must be the *current* context in `kubectl`
 * Local docker daemon configured
 * Built the `src/d6s` project and have it somewhere (or use the helper `d6s.ps1` script in this repo that does `dotnet run`)
-* `kubectl apply -f .\deploy\dotnetapp.crd.yaml` in this repo (temporary)
 
 1. `dotnet new web` somewhere
 1. `cd` to the new app
 1. Run `d6s push --acr [YOUR ACR INSTANCE NAME] --local-build`
 
-For now, all this does is:
-* Publish the app
-* Build a docker image from it
-* Push it to your ACR instance
-* Publish a new CRD to the AKS instance for the "app"
-    * You can view it with `kubectl get dotnetapp`
+The command will:
+* Locally publish the app as a framework-dependent app
+* Generate a docker image for your app with a random unique tag
+* Generate Kubernetes YAML descriptions:
+    * A Deployment that creates 3 replicas of a pod containing only your app container
+    * A Service referencing those pods
+    * An Ingress making that service available at `/[k8s-safe project name]`
 
-## TODO:
-* Include instructions to deploy the operator
-* Have the operator actually do something useful with the CRD (maintain Deployments, etc.)
+## Small TODOS
+* Allow customizing ingress path
+* Allow customizing app name, it must be "DNS safe" (alphanumeric, `-` and `.`)
+* Allow remote build on ACR (right now the `--local-build` switch is required)
+* Config management. Right now it's mostly hardcoded in `DotnetesContext` but the idea is that type is loaded from some project/user/environment-level config.
+
+## Big TODOS
+* Build a service that can handle the whole thing? I.e. just publish the code and the rest happens in the ☁ Cloud ☁!
+* Add support for more k8s customization (customizing the podspec, adding other resources, etc.)

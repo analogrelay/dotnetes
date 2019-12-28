@@ -8,12 +8,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Resources\deployment.yaml" />
     <None Remove="Resources\dotnetapp.yml" />
+    <None Remove="Resources\ingress.yaml" />
+    <None Remove="Resources\service.yaml" />
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Resources\Default.dockerfile" />
-    <EmbeddedResource Include="Resources\dotnetapp.yml" />
+    <EmbeddedResource Include="Resources\deployment.yaml" />
+    <EmbeddedResource Include="Resources\ingress.yaml" />
+    <EmbeddedResource Include="Resources\service.yaml" />
   </ItemGroup>
 
   <ItemGroup>

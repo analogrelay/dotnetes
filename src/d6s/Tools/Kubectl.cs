@@ -8,6 +8,6 @@ namespace Dotnetes.CommandLine.Tools
 
         public Kubectl(string toolPath) : base(toolPath) { }
 
-        public Task<int> ApplyAsync(string path) => ExecuteAsync("apply", "--filename", path);
+        public Task<int> ApplyKustomizationAsync(string path) => ExecuteAsync("apply", "--kustomize", path);
     }
 }

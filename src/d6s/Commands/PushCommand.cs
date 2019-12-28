@@ -32,7 +32,7 @@ namespace Dotnetes.CommandLine.Commands
             console.WriteLine($"Using dotnetes context: {context.Name}");
 
             var acr = context.ContainerRegistry;
-            if(!String.IsNullOrEmpty(Acr))
+            if (!String.IsNullOrEmpty(Acr))
             {
                 acr = Acr;
             }
@@ -70,14 +70,19 @@ namespace Dotnetes.CommandLine.Commands
                 }
                 // Drop the dockerfile
                 var dockerfile = Path.Combine(publishDir, "Dockerfile");
-                var dockerfileContent = await ResourceHelper.ReadResourceFileAsync("Default.dockerfile");
-                dockerfileContent = dockerfileContent.Replace("!APPDLL!", appDll);
-                await File.WriteAllTextAsync(dockerfile, dockerfileContent);
+                using (var writer = new StreamWriter(dockerfile))
+                {
+                    await writer.WriteLineAsync("FROM mcr.microsoft.com/dotnet/core/aspnet:3.1");
+                    await writer.WriteLineAsync("ENV ASPNETCORE_URLS http://*:80");
+                    await writer.WriteLineAsync("WORKDIR /app");
+                    await writer.WriteLineAsync("COPY . /app");
+                    await writer.WriteLineAsync($"ENTRYPOINT [ \"dotnet\", \"{appDll}\" ]");
+                }
 
                 // Docker build that thing!
                 // TODO: Better tagging?
-                var tag = $"{acr}/{appName.ToLowerInvariant()}/app:{Guid.NewGuid().ToString("N")}";
-                if (await Docker.Default.BuildAsync(publishDir, tag: tag, labels: new Dictionary<string, string>()
+                var containerRef = new ContainerRef($"{acr}/{appName.ToLowerInvariant()}/app", Guid.NewGuid().ToString("N"));
+                if (await Docker.Default.BuildAsync(publishDir, tag: containerRef.ToString(), labels: new Dictionary<string, string>()
                 {
                     { "dotnetes", "1" }
                 }) != 0)
@@ -89,7 +94,7 @@ namespace Dotnetes.CommandLine.Commands
                 // Step 3: Publish to ACR
                 if (!SkipPush)
                 {
-                    if (await Docker.Default.PushAsync(tag) != 0)
+                    if (await Docker.Default.PushAsync(containerRef.ToString()) != 0)
                     {
                         console.Error.WriteLine("Failed to publish image to dotnetes.");
                         return 1;
@@ -98,26 +103,58 @@ namespace Dotnetes.CommandLine.Commands
 
                 // Step 4: Push the deployment to K8s
                 var k8sAppName = MakeK8sSafe(appName);
-                var dotnetAppContent = await ResourceHelper.ReadResourceFileAsync("dotnetapp.yml");
-                dotnetAppContent = dotnetAppContent
-                    .Replace("!APPNAME!", k8sAppName)
-                    .Replace("!APPIMAGE!", tag);
-                var dotnetAppYaml = Path.Combine(publishDir, "deploy.app.yml");
-                await File.WriteAllTextAsync(dotnetAppYaml, dotnetAppContent);
-                if (await Kubectl.Default.ApplyAsync(dotnetAppYaml) != 0)
+
+                // Step 4.1: Drop all the k8s content to a directory
+                var k8sDir = Path.Combine(workDir, "k8s");
+                if (!Directory.Exists(k8sDir))
                 {
-                    console.Error.WriteLine("Failed to push app to dotnetes.");
-                    return 1;
+                    Directory.CreateDirectory(k8sDir);
                 }
 
+                var k8sFiles = new[] { "deployment.yaml", "service.yaml", "ingress.yaml" };
+                foreach (var k8sFile in k8sFiles)
+                {
+                    await ResourceHelper.DropResourceFileAsync(k8sFile, Path.Combine(k8sDir, k8sFile));
+                }
+
+                // Step 4.2: Generate kustomization.yaml and patch for ingress
+                using (var writer = new StreamWriter(Path.Combine(k8sDir, "patch-ingress.yaml")))
+                {
+                    await writer.WriteLineAsync("- op: replace");
+                    await writer.WriteLineAsync("  path: /spec/rules/0/http/paths/0/path");
+                    await writer.WriteLineAsync($"  value: /{k8sAppName}");
+                }
+
+                await GenerateKustomizationAsync(
+                    Path.Combine(k8sDir, "kustomization.yaml"),
+                    context.Namespace,
+                    k8sAppName,
+                    containerRef,
+                    resources: k8sFiles,
+                    patchesJson6902: new[] { 
+                        new KustomizePatch(
+                            group: "networking.k8s.io",
+                            version: "v1beta1",
+                            kind: "Ingress",
+                            name: "ingress",
+                            path: "patch-ingress.yaml")
+                    });
+
+                // Step 4.3: Apply!
+                console.WriteLine("Applying Kubernetes Resources...");
+                await Kubectl.Default.ApplyKustomizationAsync(k8sDir);
+
                 var oldFg = console.ForegroundColor;
-                console.ForegroundColor = ConsoleColor.Green;
-                var message = $"Your app '{k8sAppName}' has been pushed. Use 'kubectl get dotnetapps -w' to view the current status as it starts.";
-                var banner = new string('=', message.Length);
-                console.WriteLine(banner);
-                console.WriteLine(message);
-                console.WriteLine(banner);
-                console.ForegroundColor = oldFg;
+                try
+                {
+                    console.ForegroundColor = ConsoleColor.Green;
+                    console.WriteLine($"Deployed to Kubernetes! Use 'kubectl get deployment -w --namespace={context.Namespace}' and wait for deployments to be ready");
+                    console.WriteLine($"Your service will be available at 'http://{context.DnsName}/{k8sAppName}'");
+                }
+                finally
+                {
+                    console.ForegroundColor = oldFg;
+                }
             }
             finally
             {
@@ -134,6 +171,42 @@ namespace Dotnetes.CommandLine.Commands
                 }
             }
             return 0;
+        }
+
+        private async Task GenerateKustomizationAsync(string path, string ns, string appName, ContainerRef container, IReadOnlyList<string> resources, IReadOnlyList<KustomizePatch> patchesJson6902)
+        {
+            await using var writer = new StreamWriter(path);
+            await writer.WriteLineAsync("apiVersion: kustomize.config.k8s.io/v1beta1");
+            await writer.WriteLineAsync("kind: Kustomization");
+            await writer.WriteLineAsync($"namespace: {ns}");
+            await writer.WriteLineAsync("images:");
+            await writer.WriteLineAsync("  - name: appcontainer # match images with this name");
+            await writer.WriteLineAsync($"    newTag: {container.Tag} # override the tag");
+            await writer.WriteLineAsync($"    newName: {container.Repository} # override the name");
+            await writer.WriteLineAsync("commonLabels:");
+            await writer.WriteLineAsync($"    \"cloud.dot.net/app\": {appName} # Kustomize will replace this");
+            await writer.WriteLineAsync($"namePrefix: {appName}-");
+            if (resources.Count > 0)
+            {
+                await writer.WriteLineAsync("resources:");
+                foreach (var resource in resources)
+                {
+                    await writer.WriteLineAsync($"  - {resource}");
+                }
+            }
+            if (patchesJson6902.Count > 0)
+            {
+                await writer.WriteLineAsync("patchesJson6902:");
+                foreach (var patch in patchesJson6902)
+                {
+                    await writer.WriteLineAsync("  - target:");
+                    await writer.WriteLineAsync($"      group: {patch.Group}");
+                    await writer.WriteLineAsync($"      version: {patch.Version}");
+                    await writer.WriteLineAsync($"      kind: {patch.Kind}");
+                    await writer.WriteLineAsync($"      name: {patch.Name}");
+                    await writer.WriteLineAsync($"    path: {patch.Path}");
+                }
+            }
         }
 
         private string MakeK8sSafe(string appName)
@@ -174,5 +247,38 @@ namespace Dotnetes.CommandLine.Commands
             }
             throw new CommandLineException($"Could not find any project files in {projectPath}");
         }
+    }
+
+    internal struct ContainerRef
+    {
+        public ContainerRef(string repository, string tag)
+        {
+            Repository = repository;
+            Tag = tag;
+        }
+
+        public string Repository { get; }
+        public string Tag { get; }
+
+        public override string ToString() => $"{Repository}:{Tag}";
+
+    }
+
+    internal struct KustomizePatch
+    {
+        public KustomizePatch(string group, string version, string kind, string name, string path)
+        {
+            Group = group;
+            Version = version;
+            Kind = kind;
+            Name = name;
+            Path = path;
+        }
+
+        public string Group { get; }
+        public string Version { get; }
+        public string Kind { get; }
+        public string Name { get; }
+        public string Path { get; }
     }
 }

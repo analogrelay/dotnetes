@@ -1,0 +1,26 @@
+# This is a base file that will be augmented via Kustomize
+# Thus, important things (like deployment names, etc.) are missing
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app # Kustomize will apply a name prefix
+  labels:
+    "cloud.dot.net/is": "true"
+    "cloud.dot.net/app": appname # Kustomize will replace this
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      "cloud.dot.net/app": appname # Kustomize will replace this
+  template:
+    metadata:
+      labels:
+        "cloud.dot.net/is": "true"
+        "cloud.dot.net/app": appname # Kustomize will replace this
+    spec:
+      containers:
+      - name: application
+        image: appcontainer # Kustomize will replace this
+        ports:
+        - containerPort: 80

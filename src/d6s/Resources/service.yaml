@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc
+  labels:
+    "cloud.dot.net/is": "true"
+    "cloud.dot.net/app": appname # Kustomize will replace this
+spec:
+  selector:
+    "cloud.dot.net/app": appname # Kustomize will replace this
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
