@@ -8,16 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Resources\deployment.yaml" />
-    <None Remove="Resources\dotnetapp.yml" />
-    <None Remove="Resources\ingress.yaml" />
-    <None Remove="Resources\service.yaml" />
+    <None Remove="Resources\*" />
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Resources\deployment.yaml" />
-    <EmbeddedResource Include="Resources\ingress.yaml" />
-    <EmbeddedResource Include="Resources\service.yaml" />
+    <EmbeddedResource Include="Resources\*" />
   </ItemGroup>
 
   <ItemGroup>

@@ -84,7 +84,7 @@ namespace Dotnetes.CommandLine.Commands
                 var containerRef = new ContainerRef($"{acr}/{appName.ToLowerInvariant()}/app", Guid.NewGuid().ToString("N"));
                 if (await Docker.Default.BuildAsync(publishDir, tag: containerRef.ToString(), labels: new Dictionary<string, string>()
                 {
-                    { "dotnetes", "1" }
+                    { "dotnetes.dot.net/dotnetes", "true" }
                 }) != 0)
                 {
                     console.Error.WriteLine("Failed to build app image.");
@@ -122,7 +122,7 @@ namespace Dotnetes.CommandLine.Commands
                 {
                     await writer.WriteLineAsync("- op: replace");
                     await writer.WriteLineAsync("  path: /spec/rules/0/http/paths/0/path");
-                    await writer.WriteLineAsync($"  value: /{k8sAppName}");
+                    await writer.WriteLineAsync($"  value: /{k8sAppName}(/|$)(.*)");
                 }
 
                 await GenerateKustomizationAsync(

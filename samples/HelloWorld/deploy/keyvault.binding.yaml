@@ -1,0 +1,2 @@
+apiVersion: dotnetes.dot.net/v1alpha1
+kind: Deployment

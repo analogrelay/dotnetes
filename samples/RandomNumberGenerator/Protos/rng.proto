@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option csharp_namespace = "RandomNumberGenerator";
+
+package rng;
+
+// The greeting service definition.
+service RandomNumberGenerator {
+  // Sends a greeting
+  rpc GetRandomNumber (RandomNumberRequest) returns (RandomNumberReply);
+}
+
+message RandomNumberRequest {
+  int32 min = 1;
+  int32 max = 2;
+}
+
+message RandomNumberReply {
+  int32 result = 1;
+}

@@ -1,8 +1,7 @@
-﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 
-namespace HelloWorld
+namespace RandomNumberFrontend
 {
     public class Program
     {
